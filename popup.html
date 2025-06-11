@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>YouTube Auto Suscriptor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      width: 320px;
+      padding: 10px;
+    }
+    h1 {
+      font-size: 18px;
+      color: #cc0000;
+      margin-bottom: 15px;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      margin-bottom: 10px;
+      padding: 5px;
+      resize: vertical;
+    }
+    button {
+      background-color: #cc0000;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background-color: #990000;
+    }
+    #status {
+      margin-top: 10px;
+      color: #333;
+    }
+    .progress {
+      margin-top: 10px;
+      display: none;
+    }
+    .progress-bar {
+      height: 10px;
+      background-color: #f0f0f0;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background-color: #cc0000;
+      width: 0%;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <h1>YouTube Auto Suscriptor</h1>
+  
+  <p>Ingresa las URLs de los canales de YouTube (una por línea):</p>
+  <textarea id="channel-urls" placeholder="https://www.youtube.com/@NombreCanal&#10;https://www.youtube.com/@OtroCanal"></textarea>
+  
+  <button id="subscribe-button">Suscribirse a Canales</button>
+  
+  <div id="status"></div>
+  
+  <div class="progress">
+    <p>Progreso: <span id="progress-text">0/0</span></p>
+    <div class="progress-bar">
+      <div class="progress-fill"></div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

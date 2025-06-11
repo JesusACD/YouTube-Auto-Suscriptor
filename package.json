@@ -1,0 +1,17 @@
+{
+  "name": "youtube-auto-suscriptor",
+  "version": "1.0.0",
+  "description": "Extensión para suscribirse automáticamente a canales de YouTube desde una lista de URLs",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "youtube",
+    "suscripción",
+    "extensión",
+    "chrome"
+  ],
+  "author": "",
+  "license": "MIT"
+}
