@@ -6,14 +6,14 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   if (message.action === 'checkAndSubscribe') {
     console.log('Recibido mensaje para suscribirse a:', window.location.href);
     waitForSubscribeButtonAndAction();
-    return true; // Indica que la respuesta puede ser asíncrona
+    return true;
   }
 });
 
 function waitForSubscribeButtonAndAction() {
   let initialObserver = null;
   let initialTimeoutId = null;
-  const INITIAL_TIMEOUT_MS = 15000; // 15 segundos para que aparezca el botón
+  const INITIAL_TIMEOUT_MS = 8000; // Reducido de 15s a 8s
 
   const cleanupInitialObserver = () => {
     if (initialObserver) initialObserver.disconnect();
@@ -22,29 +22,51 @@ function waitForSubscribeButtonAndAction() {
 
   const attemptSubscription = () => {
     cleanupInitialObserver();
-    findAndClickSubscribeButton(true); // Proceder con el intento de suscripción
+    findAndClickSubscribeButton(true);
   };
 
   const handleInitialTimeout = () => {
     cleanupInitialObserver();
     console.warn('Timeout esperando que aparezca el botón de suscripción. Intentando de todas formas...');
-    // Como fallback, intentar buscar el botón una vez más directamente
     findAndClickSubscribeButton(true);
   };
 
   initialTimeoutId = setTimeout(handleInitialTimeout, INITIAL_TIMEOUT_MS);
 
+  // Verificación inmediata primero
+  if (checkIfSubscribed()) {
+    console.log('Ya estás suscrito a este canal (detectado en carga inicial).');
+    cleanupInitialObserver();
+    chrome.runtime.sendMessage({
+      action: 'subscriptionComplete',
+      url: window.location.href,
+      alreadySubscribed: true
+    });
+    return;
+  }
+
+  const initialButton = findSubscribeButtonOnPage();
+  if (initialButton) {
+    console.log('Botón de suscripción encontrado inmediatamente.');
+    attemptSubscription();
+    return;
+  }
+
+  // Optimizar MutationObserver - observar solo el área del botón
+  const targetElement = document.querySelector('#owner') || 
+                        document.querySelector('#channel-header') || 
+                        document.body;
+
   initialObserver = new MutationObserver((mutationsList, obs) => {
-    // Reutilizar la lógica de búsqueda de findAndClickSubscribeButton, pero sin hacer clic aún
-    if (checkIfSubscribed()) { // Si ya está suscrito, no necesitamos el botón de "suscribirse"
-        console.log('Ya estás suscrito a este canal (detectado por observador inicial).');
-        cleanupInitialObserver();
-        chrome.runtime.sendMessage({
-            action: 'subscriptionComplete',
-            url: window.location.href,
-            alreadySubscribed: true
-        });
-        return;
+    if (checkIfSubscribed()) {
+      console.log('Ya estás suscrito a este canal (detectado por observador inicial).');
+      cleanupInitialObserver();
+      chrome.runtime.sendMessage({
+        action: 'subscriptionComplete',
+        url: window.location.href,
+        alreadySubscribed: true
+      });
+      return;
     }
 
     const button = findSubscribeButtonOnPage();
@@ -54,35 +76,21 @@ function waitForSubscribeButtonAndAction() {
     }
   });
 
-  // Observar todo el body por si el botón se añade dinámicamente
-  initialObserver.observe(document.body, { childList: true, subtree: true });
-  console.log('MutationObserver inicial configurado para detectar el botón de suscripción.');
-
-  // Intento inmediato en caso de que el botón ya esté presente
-  const initialButton = findSubscribeButtonOnPage();
-  if (initialButton) {
-     console.log('Botón de suscripción encontrado inmediatamente.');
-     attemptSubscription();
-  } else if (checkIfSubscribed()) {
-     console.log('Ya estás suscrito a este canal (detectado en carga inicial).');
-     cleanupInitialObserver();
-     chrome.runtime.sendMessage({
-        action: 'subscriptionComplete',
-        url: window.location.href,
-        alreadySubscribed: true
-     });
-  }
+  initialObserver.observe(targetElement, { childList: true, subtree: true });
+  console.log('MutationObserver configurado en:', targetElement.id || targetElement.tagName);
 }
 
 // Función auxiliar para buscar el botón de suscripción sin hacer clic
 function findSubscribeButtonOnPage() {
+  // Selectores ordenados por probabilidad de éxito
   const possibleSelectors = [
     'ytd-subscribe-button-renderer button[aria-label*="Suscribirse"]',
     'ytd-subscribe-button-renderer button[aria-label*="Subscribe"]',
-    'ytd-subscribe-button-renderer paper-button:not([subscribed])',
     '#subscribe-button ytd-button-renderer button:not([aria-label*="Suscrito"]):not([aria-label*="Subscribed"])',
-    'button.yt-spec-button-shape-next--filled:not([aria-label*="Suscrito"]):not([aria-label*="Subscribed"])'
+    'button.yt-spec-button-shape-next--filled:not([aria-label*="Suscrito"]):not([aria-label*="Subscribed"])',
+    'ytd-subscribe-button-renderer paper-button:not([subscribed])'
   ];
+  
   for (const selector of possibleSelectors) {
     const buttons = document.querySelectorAll(selector);
     for (const button of buttons) {
@@ -96,8 +104,6 @@ function findSubscribeButtonOnPage() {
 
 // Función para encontrar y hacer clic en el botón de suscripción
 function findAndClickSubscribeButton(isFirstAttempt) {
-  const subscribeButton = findSubscribeButtonOnPage();
-
   if (checkIfSubscribed()) {
     console.log('Ya estás suscrito a este canal (verificación en findAndClick).');
     chrome.runtime.sendMessage({
@@ -108,16 +114,17 @@ function findAndClickSubscribeButton(isFirstAttempt) {
     return;
   }
 
+  const subscribeButton = findSubscribeButtonOnPage();
   console.log(`Intento de suscripción #${retryCount + 1}`);
 
   if (subscribeButton) {
-    console.log('Botón de suscripción encontrado (en findAndClick), haciendo clic...');
+    console.log('Botón de suscripción encontrado, haciendo clic...');
     subscribeButton.click();
 
-    // --- Inicio de la lógica del MutationObserver de CONFIRMACIÓN ---
+    // MutationObserver de confirmación optimizado
     let observer = null;
     let observationTimeoutId = null;
-    const TIMEOUT_MS = 7000; // 7 segundos para que el botón cambie
+    const TIMEOUT_MS = 3000; // Reducido de 7s a 3s
 
     const confirmSubscriptionAndCleanup = (reason) => {
       console.log(`Suscripción confirmada (${reason}).`);
@@ -126,14 +133,13 @@ function findAndClickSubscribeButton(isFirstAttempt) {
       chrome.runtime.sendMessage({
         action: 'subscriptionComplete',
         url: window.location.href
-        // 'alreadySubscribed' se maneja mediante las verificaciones iniciales de checkIfSubscribed
       });
     };
 
     const handleObservationTimeout = () => {
       if (observer) observer.disconnect();
       console.warn('Timeout esperando cambio a "Suscrito". Verificando una última vez.');
-      if (checkIfSubscribed()) { // Fallback a la verificación general
+      if (checkIfSubscribed()) {
         confirmSubscriptionAndCleanup("verificación final en timeout");
       } else {
         console.warn('No se pudo confirmar la suscripción después del clic y timeout del observador.');
@@ -144,16 +150,15 @@ function findAndClickSubscribeButton(isFirstAttempt) {
     observationTimeoutId = setTimeout(handleObservationTimeout, TIMEOUT_MS);
 
     observer = new MutationObserver((mutationsList, obs) => {
-      // Verificar el estado del botón original que se clickeó
       const buttonText = (subscribeButton.textContent || "").trim().toLowerCase();
       const ariaLabel = (subscribeButton.getAttribute('aria-label') || "").toLowerCase();
       const renderer = subscribeButton.closest('ytd-subscribe-button-renderer');
-      const hasSubscribedAttributeOnRenderer = renderer && renderer.hasAttribute('subscribed');
+      const hasSubscribedAttribute = renderer && renderer.hasAttribute('subscribed');
 
       if (buttonText === 'suscrito' || buttonText === 'subscribed' ||
           ariaLabel.includes('cancelar la suscripción') || 
           ariaLabel.includes('unsubscribe from') || 
-          hasSubscribedAttributeOnRenderer) {
+          hasSubscribedAttribute) {
         confirmSubscriptionAndCleanup("MutationObserver de confirmación");
       }
     });
@@ -161,13 +166,9 @@ function findAndClickSubscribeButton(isFirstAttempt) {
     const rendererElement = subscribeButton.closest('ytd-subscribe-button-renderer');
     const elementToObserve = rendererElement || subscribeButton;
     observer.observe(elementToObserve, { attributes: true, childList: true, subtree: true });
-    console.log('MutationObserver de confirmación configurado para el botón de suscripción.');
-    // --- Fin de la lógica del MutationObserver de CONFIRMACIÓN ---
 
   } else {
-    // Botón no encontrado por findSubscribeButtonOnPage()
-    console.warn('Botón de suscripción NO encontrado en findAndClickSubscribeButton.');
-    // handleSubscriptionFailure gestionará los reintentos o el error final.
+    console.warn('Botón de suscripción NO encontrado.');
     handleSubscriptionFailure();
   }
 }
@@ -175,8 +176,8 @@ function findAndClickSubscribeButton(isFirstAttempt) {
 function handleSubscriptionFailure() {
   retryCount++;
   if (retryCount < maxRetries) {
-    console.log(`Reintentando en 5 segundos... (Intento ${retryCount})`);
-    setTimeout(() => findAndClickSubscribeButton(false), 5000);
+    console.log(`Reintentando en 2 segundos... (Intento ${retryCount})`);
+    setTimeout(() => findAndClickSubscribeButton(false), 2000); // Reducido de 5s a 2s
   } else {
     reportError('No se pudo confirmar la suscripción después de varios reintentos.');
   }
@@ -195,45 +196,42 @@ function isElementVisible(element) {
 
 // Función mejorada para verificar si ya estamos suscritos
 function checkIfSubscribed() {
-  console.log('Verificando estado de suscripción...');
+  // Verificación rápida primero - el selector más fiable
+  if (document.querySelector('ytd-subscribe-button-renderer[subscribed]')) {
+    console.log('Detectado suscrito por atributo subscribed');
+    return true;
+  }
+
   const subscribedIndicators = [
-    'ytd-subscribe-button-renderer[subscribed]', // El más fiable
     'paper-button[subscribed]',
     'button[aria-label*="Cancelar la suscripción"]',
-    'button[aria-label*="Unsubscribe"]',
-    // Verificar el texto del botón de forma más precisa
-    () => {
-        const buttons = document.querySelectorAll('ytd-subscribe-button-renderer button');
-        for(const button of buttons) {
-            const buttonText = button.textContent || '';
-            if(isElementVisible(button) && (buttonText.trim().toLowerCase() === 'suscrito' || buttonText.trim().toLowerCase() === 'subscribed')) {
-                console.log('Detectado por texto de botón: Suscrito');
-                return true;
-            }
-        }
-        return false;
-    }
+    'button[aria-label*="Unsubscribe"]'
   ];
 
-  for (const indicator of subscribedIndicators) {
-    if (typeof indicator === 'string') {
-      const elements = document.querySelectorAll(indicator);
-      for (const element of elements) {
-        if (isElementVisible(element)) {
-          console.log('Suscripción confirmada con el selector:', indicator);
-          return true;
-        }
+  for (const selector of subscribedIndicators) {
+    const elements = document.querySelectorAll(selector);
+    for (const element of elements) {
+      if (isElementVisible(element)) {
+        console.log('Suscripción confirmada con selector:', selector);
+        return true;
       }
-    } else if (typeof indicator === 'function') {
-        if(indicator()) return true;
     }
   }
 
-  console.log('No se encontraron indicadores de suscripción.');
+  // Verificar texto del botón como último recurso
+  const buttons = document.querySelectorAll('ytd-subscribe-button-renderer button');
+  for (const button of buttons) {
+    const buttonText = (button.textContent || '').trim().toLowerCase();
+    if (isElementVisible(button) && (buttonText === 'suscrito' || buttonText === 'subscribed')) {
+      console.log('Detectado suscrito por texto de botón');
+      return true;
+    }
+  }
+
   return false;
 }
 
-// Función para reportar errores con más detalles
+// Función para reportar errores
 function reportError(errorMessage) {
   const errorDetails = `Error en la URL: ${window.location.href} - Mensaje: ${errorMessage}`;
   console.error(errorDetails);
