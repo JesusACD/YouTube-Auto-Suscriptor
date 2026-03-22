@@ -14,6 +14,11 @@ document.addEventListener('DOMContentLoaded', function() {
   const successfulList = document.getElementById('successful-list');
   const failedList = document.getElementById('failed-list');
 
+  // Elementos de extracción
+  const extractButton = document.getElementById('extract-button');
+  const copyButton = document.getElementById('copy-button');
+  const extractionStatusDiv = document.getElementById('extraction-status');
+
   // Añadir botón para abrir en modo página completa
   const openFullPageButton = document.createElement('button');
   openFullPageButton.textContent = 'Abrir en Página Completa';
@@ -36,6 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  // --- Evento: Suscribirse a canales ---
   subscribeButton.addEventListener('click', function() {
     const urls = channelUrlsTextarea.value.trim().split('\n').filter(url => url.trim() !== '');
     if (urls.length === 0) {
@@ -69,6 +75,43 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
+  // --- Evento: Extraer suscripciones ---
+  extractButton.addEventListener('click', function() {
+    extractButton.disabled = true;
+    extractionStatusDiv.textContent = 'Iniciando extracción... Se abrirá una pestaña temporal.';
+    copyButton.style.display = 'none';
+
+    chrome.runtime.sendMessage({ action: 'extractSubscriptions' }, function(response) {
+      if (chrome.runtime.lastError) {
+        extractionStatusDiv.textContent = 'Error al iniciar la extracción.';
+        extractButton.disabled = false;
+      } else if (response && response.success) {
+        extractionStatusDiv.textContent = 'Extracción en curso... Cargando canales (esto puede tomar unos segundos).';
+      }
+    });
+  });
+
+  // --- Evento: Copiar URLs al portapapeles ---
+  copyButton.addEventListener('click', function() {
+    const urls = channelUrlsTextarea.value.trim();
+    if (urls) {
+      navigator.clipboard.writeText(urls).then(() => {
+        copyButton.textContent = '✅ ¡URLs Copiadas!';
+        setTimeout(() => {
+          copyButton.textContent = '📎 Copiar URLs al Portapapeles';
+        }, 2000);
+      }).catch(err => {
+        // Fallback: seleccionar el texto del textarea
+        channelUrlsTextarea.select();
+        document.execCommand('copy');
+        copyButton.textContent = '✅ ¡URLs Copiadas!';
+        setTimeout(() => {
+          copyButton.textContent = '📎 Copiar URLs al Portapapeles';
+        }, 2000);
+      });
+    }
+  });
+
   // Escuchar mensajes del background script
   chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     switch (message.action) {
@@ -90,6 +133,27 @@ document.addEventListener('DOMContentLoaded', function() {
       case 'requestPopupClose':
         console.log('Recibida solicitud para cerrar el popup.');
         window.close();
+        break;
+
+      // --- Mensajes de extracción ---
+      case 'extractionResults':
+        extractButton.disabled = false;
+        if (message.error) {
+          extractionStatusDiv.textContent = `Error: ${message.error}`;
+        } else if (message.urls && message.urls.length > 0) {
+          // Colocar las URLs extraídas en el textarea
+          channelUrlsTextarea.value = message.urls.join('\n');
+          // Guardar las URLs extraídas
+          chrome.storage.local.set({ channelUrls: channelUrlsTextarea.value });
+          extractionStatusDiv.textContent = `✅ ${message.count} canales encontrados y cargados en el campo de texto.`;
+          copyButton.style.display = 'inline-block';
+        } else {
+          extractionStatusDiv.textContent = 'No se encontraron canales suscritos.';
+        }
+        break;
+
+      case 'extractionStatus':
+        extractionStatusDiv.textContent = message.status;
         break;
     }
   });

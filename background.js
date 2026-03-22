@@ -18,6 +18,9 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
+// Variable para rastrear la pestaña de extracción
+let extractionTabId = null;
+
 // Escuchar mensajes del popup y content scripts
 chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   switch (message.action) {
@@ -67,6 +70,48 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
         error: message.error
       });
       closeTabAndContinue(sender.tab.id);
+      sendResponse({ success: true });
+      break;
+
+    // --- Casos para extracción de suscripciones ---
+    case 'extractSubscriptions':
+      console.log('Iniciando extracción de suscripciones...');
+      startExtractionProcess();
+      sendResponse({ success: true });
+      break;
+
+    case 'extractionComplete':
+      console.log(`Extracción completada: ${message.count} canales encontrados.`);
+      // Cerrar la pestaña de extracción
+      if (extractionTabId) {
+        chrome.tabs.remove(extractionTabId, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('No se pudo cerrar la pestaña de extracción:', chrome.runtime.lastError.message);
+          }
+        });
+        extractionTabId = null;
+      }
+      // Reenviar las URLs al popup/index
+      chrome.runtime.sendMessage({
+        action: 'extractionResults',
+        urls: message.urls,
+        count: message.count
+      }, () => {
+        if (chrome.runtime.lastError) {
+          console.log('Popup/Index no disponible para recibir resultados:', chrome.runtime.lastError.message);
+        }
+      });
+      sendResponse({ success: true });
+      break;
+
+    case 'extractionProgress':
+      // Reenviar el progreso al popup/index
+      chrome.runtime.sendMessage({
+        action: 'extractionStatus',
+        status: message.status
+      }, () => {
+        if (chrome.runtime.lastError) { /* ignorar */ }
+      });
       sendResponse({ success: true });
       break;
   }
@@ -176,4 +221,54 @@ function finishProcess() {
   
   subscriptionQueue = [];
   processingTabs.clear();
+}
+
+// Función para iniciar el proceso de extracción de suscripciones
+function startExtractionProcess() {
+  const SUBSCRIPTIONS_URL = 'https://www.youtube.com/feed/channels';
+
+  // Abrir pestaña con la página de suscripciones
+  chrome.tabs.create({ url: SUBSCRIPTIONS_URL, active: false }, function(tab) {
+    extractionTabId = tab.id;
+    console.log('Pestaña de extracción creada:', tab.id);
+
+    // Esperar a que la pestaña cargue completamente
+    chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+      if (tabId === tab.id && info.status === 'complete') {
+        chrome.tabs.onUpdated.removeListener(listener);
+        console.log('Página de suscripciones cargada. Inyectando script de extracción...');
+
+        // Inyectar el content script de extracción
+        chrome.scripting.executeScript(
+          {
+            target: { tabId: tab.id },
+            files: ['extract_subscriptions.js']
+          },
+          () => {
+            if (chrome.runtime.lastError) {
+              console.error('Error al inyectar script de extracción:', chrome.runtime.lastError.message);
+              chrome.runtime.sendMessage({
+                action: 'extractionResults',
+                urls: [],
+                count: 0,
+                error: 'Error al inyectar el script de extracción.'
+              }, () => {
+                if (chrome.runtime.lastError) { /* ignorar */ }
+              });
+
+              // Cerrar la pestaña fallida
+              if (extractionTabId) {
+                chrome.tabs.remove(extractionTabId, () => {
+                  if (chrome.runtime.lastError) { /* ignorar */ }
+                });
+                extractionTabId = null;
+              }
+            } else {
+              console.log('Script de extracción inyectado exitosamente.');
+            }
+          }
+        );
+      }
+    });
+  });
 }

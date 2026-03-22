@@ -37,6 +37,10 @@
     button:hover {
       background-color: #990000;
     }
+    button:disabled {
+      background-color: #999;
+      cursor: not-allowed;
+    }
     #status {
       margin-top: 15px;
       color: #333;
@@ -59,6 +63,34 @@
       width: 0%;
       transition: width 0.3s;
     }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    #extract-button {
+      background-color: #065fd4;
+    }
+    #extract-button:hover {
+      background-color: #0450b5;
+    }
+    #extract-button:disabled {
+      background-color: #999;
+    }
+    #copy-button {
+      background-color: #2e7d32;
+      display: none;
+      margin-top: 10px;
+    }
+    #copy-button:hover {
+      background-color: #1b5e20;
+    }
+    #extraction-status {
+      margin-top: 10px;
+      color: #065fd4;
+      font-style: italic;
+      font-size: 15px;
+    }
   </style>
 </head>
 <body>
@@ -67,9 +99,14 @@
   <p>Ingresa las URLs de los canales de YouTube (una por línea):</p>
   <textarea id="channel-urls" placeholder="https://www.youtube.com/@NombreCanal&#10;https://www.youtube.com/@OtroCanal"></textarea>
   
-  <button id="subscribe-button">Suscribirse a Canales</button>
+  <div class="button-group">
+    <button id="subscribe-button">Suscribirse a Canales</button>
+    <button id="extract-button">📋 Extraer Mis Suscripciones</button>
+  </div>
+  <button id="copy-button">📎 Copiar URLs al Portapapeles</button>
   
   <div id="status"></div>
+  <div id="extraction-status"></div>
   
   <div class="progress">
     <p>Progreso: <span id="progress-text">0/0</span></p>
