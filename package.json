@@ -1,6 +1,6 @@
 {
   "name": "youtube-auto-suscriptor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Extensión para suscribirse automáticamente a canales de YouTube desde una lista de URLs",
   "main": "background.js",
   "scripts": {
