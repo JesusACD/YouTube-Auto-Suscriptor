@@ -73,6 +73,15 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
       sendResponse({ success: true });
       break;
 
+    case 'stopSubscriptions':
+      console.log('Proceso de suscripción detenido por el usuario.');
+      subscriptionQueue = [];
+      if (activeTabsCount === 0) {
+        finishProcess();
+      }
+      sendResponse({ success: true });
+      break;
+
     // --- Casos para extracción de suscripciones ---
     case 'extractSubscriptions':
       console.log('Iniciando extracción de suscripciones...');

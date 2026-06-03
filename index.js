@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
   const subscribeButton = document.getElementById('subscribe-button');
+  const stopButton = document.getElementById('stop-button');
   const channelUrlsTextarea = document.getElementById('channel-urls');
   const statusDiv = document.getElementById('status');
   const progressDiv = document.querySelector('.progress');
@@ -56,9 +57,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }, function(response) {
       if (response && response.success) {
         statusDiv.textContent = 'Proceso iniciado. Las pestañas se abrirán secuencialmente.';
+        subscribeButton.style.display = 'none';
+        stopButton.style.display = 'inline-block';
+        stopButton.disabled = false;
       } else {
         statusDiv.textContent = 'Error al iniciar el proceso.';
         progressDiv.style.display = 'none';
+      }
+    });
+  });
+
+  // --- Evento: Detener suscripciones ---
+  stopButton.addEventListener('click', function() {
+    statusDiv.textContent = 'Deteniendo proceso...';
+    stopButton.disabled = true;
+    chrome.runtime.sendMessage({ action: 'stopSubscriptions' }, function(response) {
+      if (chrome.runtime.lastError) {
+        console.error('Error al detener suscripciones:', chrome.runtime.lastError);
       }
     });
   });
@@ -111,6 +126,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (current === total) {
           statusDiv.textContent = '¡Proceso completado! Te has suscrito a todos los canales.';
         }
+        break;
+
+      case 'processComplete':
+        statusDiv.textContent = `¡Proceso finalizado! Suscripciones exitosas: ${message.successful.length}`;
+        subscribeButton.style.display = 'inline-block';
+        stopButton.style.display = 'none';
+        progressDiv.style.display = 'none';
         break;
 
       // --- Mensajes de extracción ---

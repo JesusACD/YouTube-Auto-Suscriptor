@@ -77,6 +77,24 @@
     #extract-button:disabled {
       background-color: #999;
     }
+    #stop-button {
+      background-color: #d32f2f;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 16px;
+      display: none;
+    }
+    #stop-button:hover {
+      background-color: #b71c1c;
+    }
+    #stop-button:disabled {
+      background-color: #999;
+      cursor: not-allowed;
+    }
     #copy-button {
       background-color: #2e7d32;
       display: none;
@@ -101,6 +119,7 @@
   
   <div class="button-group">
     <button id="subscribe-button">Suscribirse a Canales</button>
+    <button id="stop-button">Finalizar Proceso</button>
     <button id="extract-button">📋 Extraer Mis Suscripciones</button>
   </div>
   <button id="copy-button">📎 Copiar URLs al Portapapeles</button>
